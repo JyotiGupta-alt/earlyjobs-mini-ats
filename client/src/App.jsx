@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import api, { getApiError } from "./api.js";
 import CandidateModal from "./components/CandidateModal.jsx";
+import DeleteCandidateDialog from "./components/DeleteCandidateDialog.jsx";
 import DetailModal from "./components/DetailModal.jsx";
 import StageBadge from "./components/StageBadge.jsx";
 
@@ -41,6 +42,8 @@ export default function App() {
   const [showForm, setShowForm] = useState(false);
   const [detail, setDetail] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [filters, setFilters] = useState({ search: "", stage: "", jobTitle: "", sortBy: "applicationDate", sortOrder: "desc" });
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -119,15 +122,20 @@ export default function App() {
     }
   };
 
-  const deleteCandidate = async (candidate) => {
-    if (!window.confirm(`Delete ${candidate.fullName}? This action cannot be undone.`)) return;
+  const deleteCandidate = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      const response = await api.delete(`/candidates/${candidate._id}`);
+      const response = await api.delete(`/candidates/${deleteTarget._id}`);
       setToast(response.data.message || "Candidate deleted.");
       setDetail(null);
+      setDeleteTarget(null);
       await refresh();
     } catch (error) {
       setToast(getApiError(error));
+      setDeleteTarget(null);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -163,7 +171,7 @@ export default function App() {
       {!compact && <td>{candidate.experience} {Number(candidate.experience) === 1 ? "yr" : "yrs"}</td>}
       {!compact && <td><StageBadge stage={candidate.stage} /></td>}
       {!compact && <td className="date-cell">{dateLabel(candidate.applicationDate)}</td>}
-      {!compact && <td className="row-actions"><button className="text-action" onClick={() => openEdit(candidate)}>Edit</button><button className="text-action danger-action" onClick={() => deleteCandidate(candidate)}>Delete</button></td>}
+      {!compact && <td className="row-actions"><button className="text-action" onClick={() => openEdit(candidate)}>Edit</button><button className="text-action danger-action" onClick={() => setDeleteTarget(candidate)}>Delete</button></td>}
     </tr>
   ));
 
@@ -237,7 +245,7 @@ export default function App() {
             <section className="page-heading"><div><p className="eyebrow">HIRING WORKFLOW</p><h1>Hiring pipeline</h1><p className="page-subtitle">Move candidates through each stage of your recruitment process.</p></div><button className="button button-primary" onClick={openAdd}><Plus size={17} /> Add candidate</button></section>
             <div className="pipeline-summary">{stages.map((stage) => <button key={stage} className={`pipeline-summary-card ${pipelineStage === stage ? "selected" : ""}`} onClick={() => { setPage(1); setPipelineStage(stage); }}><span className={`stage-dot dot-${stage.toLowerCase()}`} /><span>{stage}</span><strong>{stats ? stats.byStage[stage] : "—"}</strong></button>)}</div>
             <section className="panel candidate-panel pipeline-list-panel"><div className="candidate-panel-heading"><div><h2>{pipelineStage} <span className="heading-count">{stats?.byStage?.[pipelineStage] || 0}</span></h2><p>Update candidate stage directly from the list.</p></div></div>
-              {loading ? <LoadingState /> : pageError ? <div className="compact-empty">Pipeline data is unavailable. Check the API connection and retry.</div> : candidates.length === 0 ? <div className="pipeline-empty"><span className="empty-icon"><BriefcaseBusiness size={19} /></span><strong>No candidates in {pipelineStage.toLowerCase()}</strong><span>When candidates reach this stage, they’ll show up here.</span></div> : <div className="pipeline-cards">{candidates.map((candidate) => <article className="pipeline-candidate" key={candidate._id}><div className="pipeline-candidate-top"><button className="candidate-link" onClick={() => setDetail(candidate)}><span className="avatar">{candidate.fullName.split(" ").map((part) => part[0]).slice(0, 2).join("").toUpperCase()}</span><span className="candidate-name">{candidate.fullName}<small>{candidate.email}</small></span></button><button className="text-action" onClick={() => openEdit(candidate)}>Edit</button></div><div className="pipeline-card-role"><BriefcaseBusiness size={15} />{candidate.jobTitle}<span>{candidate.experience} yrs</span></div><label className="stage-change">Move to<select value={candidate.stage} onChange={(event) => changeStage(candidate, event.target.value)}>{stages.map((stage) => <option key={stage}>{stage}</option>)}</select><ChevronDown size={14} /></label><button className="pipeline-delete" onClick={() => deleteCandidate(candidate)}>Delete candidate</button></article>)}</div>}
+              {loading ? <LoadingState /> : pageError ? <div className="compact-empty">Pipeline data is unavailable. Check the API connection and retry.</div> : candidates.length === 0 ? <div className="pipeline-empty"><span className="empty-icon"><BriefcaseBusiness size={19} /></span><strong>No candidates in {pipelineStage.toLowerCase()}</strong><span>When candidates reach this stage, they’ll show up here.</span></div> : <div className="pipeline-cards">{candidates.map((candidate) => <article className="pipeline-candidate" key={candidate._id}><div className="pipeline-candidate-top"><button className="candidate-link" onClick={() => setDetail(candidate)}><span className="avatar">{candidate.fullName.split(" ").map((part) => part[0]).slice(0, 2).join("").toUpperCase()}</span><span className="candidate-name">{candidate.fullName}<small>{candidate.email}</small></span></button><button className="text-action" onClick={() => openEdit(candidate)}>Edit</button></div><div className="pipeline-card-role"><BriefcaseBusiness size={15} />{candidate.jobTitle}<span>{candidate.experience} yrs</span></div><label className="stage-change">Move to<select value={candidate.stage} onChange={(event) => changeStage(candidate, event.target.value)}>{stages.map((stage) => <option key={stage}>{stage}</option>)}</select><ChevronDown size={14} /></label><button className="pipeline-delete" onClick={() => setDeleteTarget(candidate)}>Delete candidate</button></article>)}</div>}
             </section>
           </>}
           <footer className="app-footer">EarlyJobs Talent Workspace <span>·</span> Built for thoughtful hiring</footer>
@@ -245,6 +253,7 @@ export default function App() {
       </main>
       {showForm && <CandidateModal candidate={modalCandidate} onClose={() => { setShowForm(false); setModalCandidate(null); }} onSave={saveCandidate} saving={saving} />}
       {detail && <DetailModal candidate={detail} onClose={() => setDetail(null)} onEdit={() => openEdit(detail)} />}
+      {deleteTarget && <DeleteCandidateDialog candidate={deleteTarget} deleting={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={deleteCandidate} />}
       {toast && <div className="toast" role="status">{toast}<button onClick={() => setToast("")} aria-label="Dismiss message"><X size={15} /></button></div>}
     </div>
   );
