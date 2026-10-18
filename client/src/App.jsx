@@ -20,6 +20,12 @@ const statConfig = [
   { key: "Rejected", label: "Rejected", accent: "red", icon: X },
 ];
 const dateLabel = (value) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(value));
+const getGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+};
 
 function StatCard({ item, value }) {
   const Icon = item.icon;
@@ -31,6 +37,7 @@ function LoadingState() {
 }
 
 export default function App() {
+  const great = getGreeting();
   const [view, setView] = useState("Overview");
   const [stats, setStats] = useState(null);
   const [candidates, setCandidates] = useState([]);
@@ -211,7 +218,7 @@ export default function App() {
         <div className="content">
           {pageError && <div className="error-banner" role="alert"><strong>Could not load live data.</strong><span>{pageError}. Make sure MongoDB and the API server are running.</span><button className="text-action" onClick={refresh}>Retry</button></div>}
           {view === "Overview" && <>
-            <section className="page-heading"><div><p className="eyebrow">RECRUITMENT OVERVIEW</p><h1>Good morning, Admin <span>—</span></h1><p className="page-subtitle">Here’s what’s happening across your hiring pipeline.</p></div><button className="button button-primary" onClick={openAdd}><Plus size={17} /> Add candidate</button></section>
+            <section className="page-heading"><div><p className="eyebrow">RECRUITMENT OVERVIEW</p><h1>{great}, Admin <span>—</span></h1><p className="page-subtitle">Here’s what’s happening across your hiring pipeline.</p></div><button className="button button-primary" onClick={openAdd}><Plus size={17} /> Add candidate</button></section>
             {loading && !stats ? <LoadingState /> : <>
               <section className="stats-grid">{statConfig.map((item) => <StatCard key={item.key} item={item} value={item.key === "total" ? stats?.total : stats?.byStage?.[item.key]} />)}</section>
               <div className="overview-grid">
